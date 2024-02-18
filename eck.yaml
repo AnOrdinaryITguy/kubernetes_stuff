@@ -1,0 +1,184 @@
+---
+apiVersion: datashim.io/v1alpha1
+kind: Dataset
+metadata:
+  name: elasticsearch-data-myelastic-es-master-0
+spec:
+  local:
+    type: "COS"
+    accessKeyID: ""
+    secretAccessKey: ""
+    endpoint: ""
+    bucket: "masterbucket"
+---
+apiVersion: datashim.io/v1alpha1
+kind: Dataset
+metadata:
+  name: elasticsearch-data-myelastic-es-master-1
+spec:
+  local:
+    type: "COS"
+    accessKeyID: ""
+    secretAccessKey: ""
+    endpoint: ""
+    bucket: "masterbucket1"
+---
+apiVersion: datashim.io/v1alpha1
+kind: Dataset
+metadata:
+  name: elasticsearch-data-myelastic-es-data-0
+spec:
+  local:
+    type: "COS"
+    accessKeyID: ""
+    secretAccessKey: ""
+    endpoint: ""
+    bucket: "databucket"
+---
+apiVersion: datashim.io/v1alpha1
+kind: Dataset
+metadata:
+  name: elasticsearch-data-myelastic-es-datawarm-0
+spec:
+  local:
+    type: "COS"
+    accessKeyID: ""
+    secretAccessKey: ""
+    endpoint: ""
+    bucket: "databucket-warm"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: elastic-cluster-high-priority
+value: 10000000
+globalDefault: false
+description: "This priority class should be used for elasticsearch cluster pods only."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: filebeat-high-priority
+value: 2000000
+globalDefault: false
+description: "This priority class should be used for filebeat pods only."
+---
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+  name: myelastic
+spec:
+  version: 8.12.1
+  nodeSets:
+  - name: master
+    count: 2
+    config:
+      node.roles: ["master"]
+    podTemplate:
+      spec:
+        priorityClassName: elastic-cluster-high-priority
+        containers:
+        - name: elasticsearch
+          resources:
+            limits:
+              cpu: 1
+              memory: 2Gi
+            requests:
+              cpu: 1
+              memory: 2Gi
+        initContainers:
+        - name: sysctl
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          command: ['sh', '-c', 'sysctl -w vm.max_map_count=262144']
+  - name: data
+    count: 1
+    config:
+      node.roles: ["data", "ingest"]
+    podTemplate:
+      spec:
+        priorityClassName: elastic-cluster-high-priority
+        containers:
+        - name: elasticsearch
+          resources:
+            limits:
+              cpu: 1
+              memory: 2Gi
+            requests:
+              cpu: 1
+              memory: 2Gi
+        initContainers:
+        - name: sysctl
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          command: ['sh', '-c', 'sysctl -w vm.max_map_count=262144']
+  - name: datawarm
+    count: 1
+    config:
+      node.roles: ["data", "data_warm"]
+    podTemplate:
+          spec:
+            priorityClassName: elastic-cluster-high-priority
+            containers:
+            - name: elasticsearch
+              resources:
+                limits:
+                  cpu: 1
+                  memory: 2Gi
+                requests:
+                  cpu: 1
+                  memory: 2Gi
+            initContainers:
+            - name: sysctl
+              securityContext:
+                privileged: true
+                runAsUser: 0
+              command: ['sh', '-c', 'sysctl -w vm.max_map_count=262144']
+  http:
+    service:
+      spec:
+        type: LoadBalancer
+        ports: 
+        - protocol: TCP
+          port: 9200
+          targetPort: 9200
+          name: https
+---
+apiVersion: kibana.k8s.elastic.co/v1
+kind: Kibana
+metadata:
+  name: mykibana
+spec:
+  version: 8.12.1
+  count: 1
+  elasticsearchRef:
+    name: myelastic
+  podTemplate:
+    spec:
+      priorityClassName: elastic-cluster-high-priority
+      containers:
+      - name: kibana
+        env:
+          - name: NODE_OPTIONS
+            value: "--max-old-space-size=2048"
+          - name: SERVER_PUBLICBASEURL
+            value: "https://kibana.homelab"
+        resources:
+          limits:
+            cpu: 1
+            memory: 2Gi
+          requests:
+            cpu: 1
+            memory: 2Gi
+  http:
+    service:
+      spec:
+        type: LoadBalancer
+        ports: 
+        - protocol: TCP
+          port: 5601
+          targetPort: 5601
+          name: https
+---
