@@ -1,3 +1,5 @@
+# This is a hobby product testing ECK, please do not use this in production.
+
 ## Prerequisites
 Make sure you have persistant storage set up before attempting to install this on your kubernetes cluster.
 ## Install Instructions
