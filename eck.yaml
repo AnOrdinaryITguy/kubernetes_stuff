@@ -173,6 +173,13 @@ spec:
     spec:
       containers:
       - name: logstash
+        resources:
+            limits:
+              cpu: 1
+              memory: 2Gi
+            requests:
+              cpu: 1
+              memory: 2Gi
         volumeMounts:
         - mountPath: /usr/share/logstash/pq 
           name: pq  
