@@ -261,6 +261,15 @@ spec:
         automountServiceAccountToken: true
         securityContext:
           runAsUser: 0 
+  http:
+    service:
+      spec:
+        type: LoadBalancer
+        ports: 
+        - protocol: TCP
+          port: 8220
+          targetPort: 8220
+          name: https
 ---
 apiVersion: agent.k8s.elastic.co/v1alpha1
 kind: Agent
