@@ -1,0 +1,65 @@
+### Logstash ###
+apiVersion: logstash.k8s.elastic.co/v1alpha1
+kind: Logstash
+metadata:
+  name: mylogstash
+spec:
+  count: 1
+  elasticsearchRefs:
+    - name: myelastic
+      clusterName: me #This is the reference that will be used in pipelineconfiguration
+  version: 8.12.1
+  pipelines:
+    - pipeline.id: main
+      config.string: |
+        input {
+          beats {
+            port => 5044
+          }
+        }
+        output {
+          elasticsearch {
+            hosts => [ "${ME_ES_HOSTS}" ]
+            user => "${ME_ES_USER}"
+            password => "${ME_ES_PASSWORD}"
+            ssl_certificate_authorities => "${ME_ES_SSL_CERTIFICATE_AUTHORITY}"
+          }
+        }
+  volumeClaimTemplates:
+    - metadata:
+        name: pq #Persitant queue to avoid data loss in case of powerloss
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+  podTemplate:
+    spec:
+      containers:
+      - name: logstash
+        resources:
+            limits:
+              cpu: 1
+              memory: 2Gi
+            requests:
+              cpu: 1
+              memory: 2Gi
+        volumeMounts:
+        - mountPath: /usr/share/logstash/pq 
+          name: pq  
+          readOnly: false
+  config:
+    log.level: info
+    queue.type: persisted
+    path.queue: /usr/share/logstash/pq       
+  services:
+    - name: beats
+      service:
+        spec:
+          type: NodePort
+          ports:
+            - port: 5044
+              name: "filebeat"
+              protocol: TCP
+              targetPort: 5044
